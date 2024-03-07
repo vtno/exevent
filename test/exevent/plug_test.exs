@@ -32,6 +32,11 @@ defmodule Exevent.PlugTest do
       {:ok, conn}
     end)
 
+    filename = "test.txt"
+    File.touch(filename)
+    on_exit(fn -> File.rm(filename) end)
+    spawn(fn -> loop_write(filename, 10) end)
+
     conn = conn(:get, "/stream/test.txt")
     conn = Exevent.Plug.call(conn, [])
     assert conn.state == :chunked
@@ -56,5 +61,16 @@ defmodule Exevent.PlugTest do
       10 -> send(parent_pid, {:ok, lines})
       _ -> wait_lines(parent_pid)
     end
+  end
+
+  defp loop_write(filename, lines_to_write) do
+    for _ <- 1..lines_to_write do
+      File.write!(filename, random_line(30), [:append, :utf8])
+      Process.sleep(Enum.random([100, 500, 1000]))
+    end
+  end
+
+  defp random_line(length) do
+    (:crypto.strong_rand_bytes(length) |> Base.encode64() |> binary_part(0, length)) <> "\n"
   end
 end

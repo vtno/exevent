@@ -24,14 +24,6 @@ defmodule Exevent.Plug do
   end
 
   get "/stream/:filename" do
-    case File.rm(filename) do
-      :ok -> IO.puts("File removed")
-      _ -> IO.puts("File not removed")
-    end
-
-    File.touch(filename)
-    spawn(fn -> loop_write(filename, 10) end)
-
     chunked_conn =
       conn
       |> put_resp_header("Content-Type", "text/event-stream")
@@ -107,16 +99,5 @@ defmodule Exevent.Plug do
     |> File.stream!()
     |> Stream.drop(processed_lines)
     |> Enum.to_list()
-  end
-
-  defp loop_write(filename, lines_to_write) do
-    for _ <- 1..lines_to_write do
-      File.write!(filename, random_line(30), [:append, :utf8])
-      Process.sleep(Enum.random([100, 500, 1000]))
-    end
-  end
-
-  defp random_line(length) do
-    (:crypto.strong_rand_bytes(length) |> Base.encode64() |> binary_part(0, length)) <> "\n"
   end
 end
