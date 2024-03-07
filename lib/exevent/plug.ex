@@ -68,13 +68,13 @@ defmodule Exevent.Plug do
     IO.inspect(new_lines, label: "New lines")
 
     if Enum.count(total_lines) >= lines_to_wait_for do
-      send_lines(conn, new_lines)
+      Exevent.ChunkerBehaviour.send_lines(conn, new_lines)
       send(parent_pid, :done)
     else
       Process.sleep(300)
 
       if Enum.count(new_lines) > 0 do
-        case send_lines(conn, new_lines) do
+        case Exevent.ChunkerBehaviour.send_lines(conn, new_lines) do
           {:ok, conn} ->
             loop_read(
               parent_pid,
@@ -102,19 +102,11 @@ defmodule Exevent.Plug do
     end
   end
 
-  defp send_lines(conn, lines) do
-    chunk(conn, to_event_stream(lines))
-  end
-
   defp readlines(filename, processed_lines) do
     filename
     |> File.stream!()
     |> Stream.drop(processed_lines)
     |> Enum.to_list()
-  end
-
-  defp to_event_stream(lines) do
-    Enum.map(lines, &("data: " <> &1 <> "\n"))
   end
 
   defp loop_write(filename, lines_to_write) do

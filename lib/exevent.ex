@@ -1,5 +1,5 @@
 defmodule Exevent do
   @moduledoc """
-  Documentation for `Exevent`.
+  A Plug server which reads and stream logs from a file as Server Sent Events (SSE).
   """
 end
