@@ -8,7 +8,7 @@ defmodule Exevent.FileStreamerTest do
 
   test "#file_stream should read from file and return the exact number of line as lines_to_wait_for" do
     spawn(fn -> loop_write(@test_log_file, 20) end)
-    {:ok, lines} = Exevent.FileStreamer.file_stream(@test_log_file, 20)
+    {:ok, lines} = Exevent.FileStreamer.file_stream(self(), @test_log_file, 20)
     assert Enum.count(lines) == 20
   end
 

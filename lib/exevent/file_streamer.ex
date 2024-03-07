@@ -1,6 +1,5 @@
 defmodule Exevent.FileStreamer do
-  def file_stream(filename, lines_to_wait_for) do
-    parent_pid = self()
+  def file_stream(parent_pid, filename, lines_to_wait_for) do
     spawn(fn -> loop_read(parent_pid, filename, lines_to_wait_for) end)
 
     receive do
