@@ -8,6 +8,11 @@ defmodule Exevent.Plug do
   def call(conn, _opts) do
     case conn.path_info do
       ["stream", filename] ->
+        case File.rm(filename) do
+          :ok -> IO.puts("File removed")
+          _ -> IO.puts("File not removed")
+        end
+
         File.touch(filename)
         spawn(fn -> loop_write(filename, 10) end)
 
@@ -17,15 +22,27 @@ defmodule Exevent.Plug do
           |> put_resp_header("Cache-Control", "no-cache")
           |> put_resp_header("Transfer-Encoding", "chunked")
           |> send_chunked(200)
-          |> loop_read(filename, 10)
 
-        case File.rm!(filename) do
-          _ -> chunked_conn
+        parent_pid = self()
+
+        spawn(fn ->
+          loop_read(parent_pid, chunked_conn, filename, 10)
+        end)
+
+        # wait for any message from the read
+        receive do
+          :done ->
+            IO.puts("Done reading")
+            chunked_conn
         end
 
+        chunked_conn
+
       [] ->
+        file = File.read!("index.html")
+
         conn
-        |> send_resp(200, "Welcome to Exevent")
+        |> send_resp(200, file)
 
       _ ->
         conn
@@ -33,41 +50,50 @@ defmodule Exevent.Plug do
     end
   end
 
-  defp loop_read(conn, filename, lines_to_wait_for, lines \\ [], processed_lines \\ 0) do
+  defp loop_read(parent_pid, conn, filename, lines_to_wait_for, lines \\ [], processed_lines \\ 0) do
     new_lines = readlines(filename, processed_lines)
     total_lines = Enum.concat(lines, new_lines)
 
-    IO.inspect(conn, label: "conn")
-    IO.inspect(new_lines, label: "new_lines")
-    IO.inspect(total_lines, label: "total_lines")
+    IO.inspect(Enum.count(total_lines), label: "Total lines")
+    IO.inspect(new_lines, label: "New lines")
 
-    next = fn conn ->
-      loop_read(conn, filename, lines_to_wait_for, total_lines, Enum.count(total_lines))
-    end
+    if Enum.count(total_lines) >= lines_to_wait_for do
+      send_lines(conn, new_lines)
+      send(parent_pid, :done)
+    else
+      Process.sleep(300)
 
-    case Enum.count(total_lines) do
-      ^lines_to_wait_for ->
-        conn
+      if Enum.count(new_lines) > 0 do
+        case send_lines(conn, new_lines) do
+          {:ok, conn} ->
+            loop_read(
+              parent_pid,
+              conn,
+              filename,
+              lines_to_wait_for,
+              total_lines,
+              processed_lines + Enum.count(new_lines)
+            )
 
-      _ ->
-        if Enum.count(total_lines) >= lines_to_wait_for do
-          conn
-        else
-          Process.sleep(300)
-          send_lines(conn, new_lines, next)
+          {:error, reason} ->
+            IO.inspect(reason, label: "Error reason")
+            send(parent_pid, :done)
         end
+      else
+        loop_read(
+          parent_pid,
+          conn,
+          filename,
+          lines_to_wait_for,
+          total_lines,
+          processed_lines
+        )
+      end
     end
   end
 
-  defp send_lines(conn, lines, next) do
-    case chunk(conn, to_event_stream(lines)) do
-      {:ok, conn} ->
-        next.(conn)
-
-      {:error, reason} ->
-        IO.inspect(reason)
-        conn
-    end
+  defp send_lines(conn, lines) do
+    chunk(conn, to_event_stream(lines))
   end
 
   defp readlines(filename, processed_lines) do

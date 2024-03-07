@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Exevent</title>
+  </head>
+
+  <body>
+    <div>
+      <h1>Stream from server</h1>
+      <button onclick="startStreaming()">Start Streaming</button>
+      <main></main>
+    </div>
+    <script>
+      function startStreaming(e) {
+        const eventSource = new EventSource(
+          "http://localhost:4000/stream/text.txt",
+        );
+        eventSource.onmessage = (event) => {
+          const main = document.querySelector("main");
+          const line = document.createElement("p");
+          line.textContent = event.data;
+          main.appendChild(line);
+        };
+        eventSource.onerror = (error) => {
+          console.log("EventSource failed:", error);
+          eventSource.close();
+        };
+      }
+    </script>
+  </body>
+</html>
