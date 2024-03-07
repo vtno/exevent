@@ -1,21 +1,7 @@
 # Exevent
 
-**TODO: Add description**
+A service which stream text from a file and emit Server Sent Event (SSE) to the client when requested.
 
-## Installation
+## Development
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `exevent` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:exevent, "~> 0.1.0"}
-  ]
-end
-```
-
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/exevent>.
-
+Run `mix deps.get` to install dependencies and `mix test` to run the test suite. To start a dev server run `iex -S mix`.
