@@ -10,6 +10,7 @@ defmodule Exevent.Application do
     children = [
       # Starts a worker by calling: Exevent.Worker.start_link(arg)
       # {Exevent.Worker, arg},
+      {Bandit, plug: Exevent.Plug}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
