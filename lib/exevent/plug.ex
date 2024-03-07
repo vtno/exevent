@@ -1,53 +1,53 @@
 defmodule Exevent.Plug do
   import Plug.Conn
+  use Plug.Router
 
-  def init(options) do
-    options
+  plug(Plug.Logger)
+  plug(:match)
+  plug(:dispatch)
+
+  get "/" do
+    file = File.read!("index.html")
+
+    conn
+    |> send_resp(200, file)
   end
 
-  def call(conn, _opts) do
-    case conn.path_info do
-      ["stream", filename] ->
-        case File.rm(filename) do
-          :ok -> IO.puts("File removed")
-          _ -> IO.puts("File not removed")
-        end
-
-        File.touch(filename)
-        spawn(fn -> loop_write(filename, 10) end)
-
-        chunked_conn =
-          conn
-          |> put_resp_header("Content-Type", "text/event-stream")
-          |> put_resp_header("Cache-Control", "no-cache")
-          |> put_resp_header("Transfer-Encoding", "chunked")
-          |> send_chunked(200)
-
-        parent_pid = self()
-
-        spawn(fn ->
-          loop_read(parent_pid, chunked_conn, filename, 10)
-        end)
-
-        # wait for any message from the read
-        receive do
-          :done ->
-            IO.puts("Done reading")
-            chunked_conn
-        end
-
-        chunked_conn
-
-      [] ->
-        file = File.read!("index.html")
-
-        conn
-        |> send_resp(200, file)
-
-      _ ->
-        conn
-        |> send_resp(404, "Not found")
+  get "/stream/:filename" do
+    case File.rm(filename) do
+      :ok -> IO.puts("File removed")
+      _ -> IO.puts("File not removed")
     end
+
+    File.touch(filename)
+    spawn(fn -> loop_write(filename, 10) end)
+
+    chunked_conn =
+      conn
+      |> put_resp_header("Content-Type", "text/event-stream")
+      |> put_resp_header("Cache-Control", "no-cache")
+      |> put_resp_header("Transfer-Encoding", "chunked")
+      |> send_chunked(200)
+
+    parent_pid = self()
+
+    spawn(fn ->
+      loop_read(parent_pid, chunked_conn, filename, 10)
+    end)
+
+    # wait for any message from the read
+    receive do
+      :done ->
+        IO.puts("Done reading")
+        chunked_conn
+    end
+
+    chunked_conn
+  end
+
+  match _ do
+    conn
+    |> send_resp(404, "Not found")
   end
 
   defp loop_read(parent_pid, conn, filename, lines_to_wait_for, lines \\ [], processed_lines \\ 0) do
