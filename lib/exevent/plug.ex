@@ -6,11 +6,21 @@ defmodule Exevent.Plug do
   plug(:match)
   plug(:dispatch)
 
-  get "/" do
-    file = File.read!("index.html")
+  def init(opts) do
+    :ets.new(:index_html, [:named_table, read_concurrency: true])
+    :ets.insert(:index_html, {:content, File.read!("index.html")})
+    opts
+  end
 
-    conn
-    |> send_resp(200, file)
+  get "/" do
+    case :ets.lookup(:index_html, :content) do
+      [{:content, content}] ->
+        conn
+        |> send_resp(200, content)
+
+      _ ->
+        "Not found"
+    end
   end
 
   get "/stream/:filename" do
