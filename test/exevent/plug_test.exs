@@ -32,10 +32,12 @@ defmodule Exevent.PlugTest do
       {:ok, conn}
     end)
 
+    {:ok, streaming_dir} = Application.fetch_env(:exevent, :streaming_dir)
     filename = "test.txt"
-    File.touch(filename)
-    on_exit(fn -> File.rm(filename) end)
-    spawn(fn -> loop_write(filename, 10) end)
+    filepath = Path.join([streaming_dir, filename])
+    File.touch(filepath)
+    on_exit(fn -> File.rm(filepath) end)
+    spawn(fn -> loop_write(filepath, 10) end)
 
     conn = conn(:get, "/stream/test.txt")
     conn = Exevent.Plug.call(conn, [])

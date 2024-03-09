@@ -7,14 +7,16 @@ defmodule Exevent.Plug do
   plug(:dispatch)
 
   def init(opts) do
-    :ets.new(:index_html, [:named_table, read_concurrency: true])
-    :ets.insert(:index_html, {:content, File.read!("index.html")})
+    streaming_dir = Application.fetch_env!(:exevent, :streaming_dir)
+    :ets.new(:app, [:named_table, read_concurrency: true])
+    :ets.insert(:app, {:html_content, File.read!("index.html")})
+    :ets.insert(:app, {:streaming_dir, streaming_dir})
     opts
   end
 
   get "/" do
-    case :ets.lookup(:index_html, :content) do
-      [{:content, content}] ->
+    case :ets.lookup(:app, :html_content) do
+      [{:html_content, content}] ->
         conn
         |> send_resp(200, content)
 
@@ -24,27 +26,33 @@ defmodule Exevent.Plug do
   end
 
   get "/stream/:filename" do
-    chunked_conn =
-      conn
-      |> put_resp_header("Content-Type", "text/event-stream")
-      |> put_resp_header("Cache-Control", "no-cache")
-      |> put_resp_header("Transfer-Encoding", "chunked")
-      |> send_chunked(200)
-
     parent_pid = self()
 
-    spawn(fn ->
-      loop_read(parent_pid, chunked_conn, filename, 10)
-    end)
+    case :ets.lookup(:app, :streaming_dir) do
+      [{:streaming_dir, streaming_dir}] ->
+        chunked_conn =
+          conn
+          |> put_resp_header("Content-Type", "text/event-stream")
+          |> put_resp_header("Cache-Control", "no-cache")
+          |> put_resp_header("Transfer-Encoding", "chunked")
+          |> send_chunked(200)
 
-    # wait for any message from the read
-    receive do
-      :done ->
-        IO.puts("Done reading")
+        spawn(fn ->
+          loop_read(parent_pid, chunked_conn, Path.join([streaming_dir, filename]), 10)
+        end)
+
+        # wait for any message from the read
+        receive do
+          :done ->
+            IO.puts("Done reading")
+            chunked_conn
+        end
+
         chunked_conn
-    end
 
-    chunked_conn
+      _ ->
+        conn |> send_resp(500, "Internal server error")
+    end
   end
 
   match _ do
